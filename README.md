@@ -1,2 +1,2 @@
 # budget-tracker
-Budget Tracker using React, Firebase, Ant Design
+Budget Tracker using React, Firebase, Ant Design, ChartJS
