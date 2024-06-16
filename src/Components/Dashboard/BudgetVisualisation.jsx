@@ -1,34 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { Typography, Col, Row } from "antd";
 import { UserAuth } from "../../Context/AuthContext";
-import { Bar } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Bar, Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, Title, Tooltip, Legend, PointElement } from 'chart.js';
 import moment from "moment";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend); //registers bar chart properties, also resets the bar chart
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend); //registers bar and line chart properties, also resets the chart
+
 const { Title: AntTitle } = Typography;
 
 const BudgetVisualisation = () => {
   const [last7Days, setLast7Days] = useState([]);
+  const [currentMonthDays, setCurrentMonthDays] = useState([]);
   const [incomeData, setIncomeData] = useState([]);
   const [expenseData, setExpenseData] = useState([]);
   const { fetchData, refresh } = UserAuth();
 
   useEffect(() => {
-    
-
     fetchData("income",'C').then(incomeData => {
-
       setIncomeData(incomeData);
       //console.log("incomedata: ", incomeData);           
-
-    })
+    });
 
     fetchData("expense",'D').then(expenseData => {
         setExpenseData(expenseData);
         //console.log("expense data: ", expenseData)
-    })
-
+    });
   }, [fetchData, refresh]);
 
   useEffect(() => {
@@ -40,24 +37,43 @@ const BudgetVisualisation = () => {
       setLast7Days(days);
     };
 
+    const generateCurrentMonthDays = () => {
+      const days = [];
+      const startOfMonth = moment().startOf('month');
+      const endOfMonth = moment().endOf('month');
+      let day = startOfMonth;
+
+      while (day <= endOfMonth) {
+        days.push(day.format("D MMM"));
+        day = day.add(1, 'day');
+      }
+
+      setCurrentMonthDays(days);
+    };
+
     generateLast7Days();
+    generateCurrentMonthDays();
   }, []);
 
-  const aggregateAmounts = (data) => {
-    const amounts = Array(7).fill(0);
+  const aggregateAmounts = (data, days, format) => {
+    const amounts = Array(days.length).fill(0);
 
     data.forEach(item => {
-      const dayIndex = 6 - moment().diff(moment(item["transactionDate"]), "days");
-      if (dayIndex >= 0 && dayIndex < 7) {
-        amounts[dayIndex] += item.amount;
+      const date = moment(item["transactionDate"]).format(format);
+      const index = days.indexOf(date);
+      if (index !== -1) {
+        amounts[index] += item.amount;
       }
     });
 
     return amounts;
   };
 
-  const incomeAmounts = aggregateAmounts(incomeData);
-  const expenseAmounts = aggregateAmounts(expenseData);
+  const incomeAmounts7Days = aggregateAmounts(incomeData, last7Days, "ddd");
+  const expenseAmounts7Days = aggregateAmounts(expenseData, last7Days, "ddd");
+
+  const incomeAmountsMonth = aggregateAmounts(incomeData, currentMonthDays, "D MMM");
+  const expenseAmountsMonth = aggregateAmounts(expenseData, currentMonthDays, "D MMM");
 
   const barChartData = {
     labels: last7Days,
@@ -69,7 +85,7 @@ const BudgetVisualisation = () => {
         borderWidth: 3,
         hoverBackgroundColor: "rgba(75,192,192,0.4)",
         hoverBorderColor: "rgba(75,192,192,1)",
-        data: incomeAmounts,
+        data: incomeAmounts7Days,
       },
       {
         label: "Expenses",
@@ -78,7 +94,29 @@ const BudgetVisualisation = () => {
         borderWidth: 3,
         hoverBackgroundColor: "rgba(255,99,132,0.4)",
         hoverBorderColor: "rgba(255,99,132,1)",
-        data: expenseAmounts,
+        data: expenseAmounts7Days,
+      },
+    ],
+  };
+
+  const lineChartData = {
+    labels: currentMonthDays,
+    datasets: [
+      {
+        label: "Income",
+        fill: false,
+        backgroundColor: "rgba(75,192,192,0.2)",
+        borderColor: "rgba(75,192,192,1)",
+        borderWidth: 3,
+        data: incomeAmountsMonth,
+      },
+      {
+        label: "Expenses",
+        fill: false,
+        backgroundColor: "rgba(255,99,132,0.2)",
+        borderColor: "rgba(255,99,132,1)",
+        borderWidth: 3,
+        data: expenseAmountsMonth,
       },
     ],
   };
@@ -90,11 +128,12 @@ const BudgetVisualisation = () => {
       </AntTitle>
       <Row gutter={16} style={{ marginLeft: 0 }}>
         <Col span={12}>
-          <Bar data={barChartData}/>
-          <h2 style={{ display: "flex", justifyContent: "center"}}>Income vs Expenses (last 7 days)</h2>
+          <Bar data={barChartData} />
+          <h2 style={{ display: "flex", justifyContent: "center" }}>Income vs Expenses (last 7 days)</h2>
         </Col>
         <Col span={12}>
-            {/* add line chart code for last 30 days/monthly income vs expenses */}
+          <Line data={lineChartData} />
+          <h2 style={{ display: "flex", justifyContent: "center" }}>Income vs Expenses (Current Month: {moment().format("MMMM")})</h2>
         </Col>
       </Row>
     </div>
